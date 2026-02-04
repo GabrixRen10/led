@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Controllo LED con Mano</title>
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<style>
+  body {
+    font-family: Arial;
+    background: #eee;
+    text-align: center;
+  }
+  video {
+    border: 3px solid black;
+    border-radius: 10px;
+  }
+</style>
+</head>
+
+<body>
+
+<h2>Controllo LED con le dita ✋</h2>
+<p>Se vedi questo testo, il sito FUNZIONA.</p>
+
+<video id="video" width="320" height="240" autoplay></video>
+
+<h3>Dita rilevate: <span id="count">0</span></h3>
+
+<script>
+const video = document.getElementById("video");
+const countSpan = document.getElementById("count");
+
+// 🔴 METTI QUI L'IP DELL'ESP32
+const ESP32_IP = "http://192.168.0.182"; // <-- CAMBIA QUESTO
+
+let lastValue = -1;
+
+const hands = new Hands({
+  locateFile: file =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+  maxNumHands: 1,
+  minDetectionConfidence: 0.6,
+  minTrackingConfidence: 0.6
+});
+
+hands.onResults(results => {
+  if (!results.multiHandLandmarks) return;
+
+  const lm = results.multiHandLandmarks[0];
+  let fingers = 0;
+
+  // 4 dita
+  if (lm[8].y < lm[6].y) fingers++;
+  if (lm[12].y < lm[10].y) fingers++;
+  if (lm[16].y < lm[14].y) fingers++;
+  if (lm[20].y < lm[18].y) fingers++;
+
+  // pollice (semplificato)
+  if (lm[4].x < lm[3].x) fingers++;
+
+  if (fingers !== lastValue) {
+    lastValue = fingers;
+    countSpan.innerText = fingers;
+
+    fetch(`${ESP32_IP}/set?value=${fingers}`)
+      .catch(() => console.log("ESP32 non raggiungibile"));
+  }
+});
+
+const camera = new Camera(video, {
+  onFrame: async () => {
+    await hands.send({ image: video });
+  },
+  width: 320,
+  height: 240
+});
+
+camera.start();
+</script>
+
+</body>
+</html>
